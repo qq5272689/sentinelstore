@@ -5,7 +5,7 @@ import (
 	gSessions "github.com/gorilla/sessions"
 )
 
-//New returns a new Redis store
+//New returns a new Sentinel store
 func NewNegroniSentinelStore(sentinels []string, mastername, password string,poolsize,timeout,sessionExpire int, keyPairs ...[]byte) (nSessions.Store, error) {
 	store, err := NewSentinelStore(sentinels , mastername, password ,poolsize,timeout,sessionExpire, keyPairs...)
 	if err != nil {

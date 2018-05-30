@@ -13,23 +13,20 @@ import (
 	"github.com/mediocregopher/radix.v3"
 	"github.com/gorilla/securecookie"
 	"github.com/gorilla/sessions"
-	"github.com/garyburd/redigo/redis"
 	"strconv"
 )
 
-// Amount of time for cookies/redis keys to expire.
-//var sessionExpire = 86400 * 30
 
-// SessionSerializer provides an interface hook for alternative serializers
+// 会话序列化接口
 type SessionSerializer interface {
 	Deserialize(d []byte, ss *sessions.Session) error
 	Serialize(ss *sessions.Session) ([]byte, error)
 }
 
-// JSONSerializer encode the session map to JSON.
+// json 序列化类型
 type JSONSerializer struct{}
 
-// Serialize to JSON. Will err if there are unmarshalable key values
+// json 序列化
 func (s JSONSerializer) Serialize(ss *sessions.Session) ([]byte, error) {
 	m := make(map[string]interface{}, len(ss.Values))
 	for k, v := range ss.Values {
@@ -44,7 +41,7 @@ func (s JSONSerializer) Serialize(ss *sessions.Session) ([]byte, error) {
 	return json.Marshal(m)
 }
 
-// Deserialize back to map[string]interface{}
+// json 反序列化
 func (s JSONSerializer) Deserialize(d []byte, ss *sessions.Session) error {
 	m := make(map[string]interface{})
 	err := json.Unmarshal(d, &m)
@@ -58,10 +55,10 @@ func (s JSONSerializer) Deserialize(d []byte, ss *sessions.Session) error {
 	return nil
 }
 
-// GobSerializer uses gob package to encode the session map
+// Gob 序列化类型
 type GobSerializer struct{}
 
-// Serialize using gob
+// Gob 序列化
 func (s GobSerializer) Serialize(ss *sessions.Session) ([]byte, error) {
 	buf := new(bytes.Buffer)
 	enc := gob.NewEncoder(buf)
@@ -72,55 +69,41 @@ func (s GobSerializer) Serialize(ss *sessions.Session) ([]byte, error) {
 	return nil, err
 }
 
-// Deserialize back to map[interface{}]interface{}
+// Gob 反序列化
 func (s GobSerializer) Deserialize(d []byte, ss *sessions.Session) error {
 	dec := gob.NewDecoder(bytes.NewBuffer(d))
 	return dec.Decode(&ss.Values)
 }
 
-// RediStore stores sessions in a redis backend.
+// SentinleStore类型
 type SentinleStore struct {
 	Sentinel          *radix.Sentinel
 	Codecs        []securecookie.Codec
-	Options       *sessions.Options // default configuration
-	DefaultMaxAge int               // default Redis TTL for a MaxAge == 0 session
+	Options       *sessions.Options
+	DefaultMaxAge int
 	maxLength     int
 	keyPrefix     string
 	serializer    SessionSerializer
 }
 
-// SetMaxLength sets RediStore.maxLength if the `l` argument is greater or equal 0
-// maxLength restricts the maximum length of new sessions to l.
-// If l is 0 there is no limit to the size of a session, use with caution.
-// The default for a new RediStore is 4096. Redis allows for max.
-// value sizes of up to 512MB (http://redis.io/topics/data-types)
-// Default: 4096,
+// 设置允许的最大长度 默认4096
 func (s *SentinleStore) SetMaxLength(l int) {
 	if l >= 0 {
 		s.maxLength = l
 	}
 }
 
-// SetKeyPrefix set the prefix
+// 设置prefix
 func (s *SentinleStore) SetKeyPrefix(p string) {
 	s.keyPrefix = p
 }
 
-// SetSerializer sets the serializer
+// 设置序列化工具
 func (s *SentinleStore) SetSerializer(ss SessionSerializer) {
 	s.serializer = ss
 }
 
-// SetMaxAge restricts the maximum age, in seconds, of the session record
-// both in database and a browser. This is to change session storage configuration.
-// If you want just to remove session use your session `s` object and change it's
-// `Options.MaxAge` to -1, as specified in
-//    http://godoc.org/github.com/gorilla/sessions#Options
-//
-// Default is the one provided by this package value - `sessionExpire`.
-// Set it to 0 for no restriction.
-// Because we use `MaxAge` also in SecureCookie crypting algorithm you should
-// use this function to change `MaxAge` value.
+// 设置最大的cookie过期时间
 func (s *SentinleStore) SetMaxAge(v int) {
 	var c *securecookie.SecureCookie
 	var ok bool
@@ -134,22 +117,8 @@ func (s *SentinleStore) SetMaxAge(v int) {
 	}
 }
 
-func dial(network, address, password string) (redis.Conn, error) {
-	c, err := redis.Dial(network, address)
-	if err != nil {
-		return nil, err
-	}
-	if password != "" {
-		if _, err := c.Do("AUTH", password); err != nil {
-			c.Close()
-			return nil, err
-		}
-	}
-	return c, err
-}
 
-// NewRediStore returns a new RediStore.
-// size: maximum number of idle connections.
+// sentinel相关配置
 
 var TimeOut = 300
 var RedisPassWord = ""
@@ -158,11 +127,12 @@ var RedisPoolNum = 100
 var RedisMasterName = "mymaster"
 var Sentinels = []string{}
 
+// senintel 连接函数
 func sentinelConnFunc(network,addr string) (radix.Conn,error)  {
 	conn,err := radix.DialTimeout(network,addr,time.Millisecond * time.Duration(TimeOut))
 	return conn,err
 }
-
+// redis 连接函数
 func redisConnFunc(network,addr string) (radix.Conn, error)  {
 	conn, err := radix.DialTimeout(network, addr, time.Millisecond*time.Duration(TimeOut))
 	if err != nil {
@@ -181,11 +151,13 @@ func redisConnFunc(network,addr string) (radix.Conn, error)  {
 	return conn, nil
 }
 
+
+// redis 连接池 函数
 func redisPoolFunc(network, addr string) (radix.Client, error) {
 	return radix.NewPool(network, addr, RedisPoolNum, radix.PoolConnFunc(redisConnFunc))
 }
 
-
+// 创建sentine store
 func NewSentinelStore(sentinels []string, mastername, password string,poolsize,timeout,sessionExpire int, keyPairs ...[]byte) (*SentinleStore, error) {
 	Sentinels = sentinels
 	RedisMasterName = mastername
@@ -196,14 +168,13 @@ func NewSentinelStore(sentinels []string, mastername, password string,poolsize,t
 
 	SentinelRedis,SRError:=radix.NewSentinel(RedisMasterName,Sentinels,radix.SentinelConnFunc(sentinelConnFunc),radix.SentinelPoolFunc(redisPoolFunc))
 	rs := &SentinleStore{
-		// http://godoc.org/github.com/garyburd/redigo/redis#Pool
 		Sentinel:   SentinelRedis,
 		Codecs: securecookie.CodecsFromPairs(keyPairs...),
 		Options: &sessions.Options{
 			Path:   "/",
 			MaxAge: sessionExpire,
 		},
-		DefaultMaxAge: 60 * 20, // 20 minutes seems like a reasonable default
+		DefaultMaxAge: 60 * 20, // 默认MaxAge
 		maxLength:     4096,
 		keyPrefix:     "session_",
 		serializer:    GobSerializer{},
@@ -213,19 +184,19 @@ func NewSentinelStore(sentinels []string, mastername, password string,poolsize,t
 }
 
 
-// Close closes the underlying *redis.Pool
+// Close sentinel 连接
 func (s *SentinleStore) Close() error {
 	return s.Sentinel.Close()
 }
 
-// Get returns a session for the given name after adding it to the registry.
+// 获取session 实例
 //
 // See gorilla/sessions FilesystemStore.Get().
 func (s *SentinleStore) Get(r *http.Request, name string) (*sessions.Session, error) {
 	return sessions.GetRegistry(r).Get(s, name)
 }
 
-// New returns a session for the given name without adding it to the registry.
+// 返回一个新session实例
 //
 // See gorilla/sessions FilesystemStore.New().
 func (s *SentinleStore) New(r *http.Request, name string) (*sessions.Session, error) {
@@ -234,7 +205,6 @@ func (s *SentinleStore) New(r *http.Request, name string) (*sessions.Session, er
 		ok  bool
 	)
 	session := sessions.NewSession(s, name)
-	// make a copy
 	options := *s.Options
 	session.Options = &options
 	session.IsNew = true
@@ -242,22 +212,21 @@ func (s *SentinleStore) New(r *http.Request, name string) (*sessions.Session, er
 		err = securecookie.DecodeMulti(name, c.Value, &session.ID, s.Codecs...)
 		if err == nil {
 			ok, err = s.load(session)
-			session.IsNew = !(err == nil && ok) // not new if no error and data available
+			session.IsNew = !(err == nil && ok)
 		}
 	}
 	return session, err
 }
 
-// Save adds a single session to the response.
+// 保存session信息
 func (s *SentinleStore) Save(r *http.Request, w http.ResponseWriter, session *sessions.Session) error {
-	// Marked for deletion.
+
 	if session.Options.MaxAge < 0 {
 		if err := s.delete(session); err != nil {
 			return err
 		}
 		http.SetCookie(w, sessions.NewCookie(session.Name(), "", session.Options))
 	} else {
-		// Build an alphanumeric key for the redis store.
 		if session.ID == "" {
 			session.ID = strings.TrimRight(base32.StdEncoding.EncodeToString(securecookie.GenerateRandomKey(32)), "=")
 		}
@@ -273,37 +242,24 @@ func (s *SentinleStore) Save(r *http.Request, w http.ResponseWriter, session *se
 	return nil
 }
 
-// Delete removes the session from redis, and sets the cookie to expire.
-//
-// WARNING: This method should be considered deprecated since it is not exposed via the gorilla/sessions interface.
-// Set session.Options.MaxAge = -1 and call Save instead. - July 18th, 2013
+// 删除session信息
 func (s *SentinleStore) Delete(r *http.Request, w http.ResponseWriter, session *sessions.Session) error {
 
 	if err := s.Sentinel.Do(radix.Cmd(nil,"DEL",s.keyPrefix+session.ID)); err != nil {
 		return err
 	}
-	// Set cookie to expire.
+	// 设置cookie过期
 	options := *session.Options
 	options.MaxAge = -1
 	http.SetCookie(w, sessions.NewCookie(session.Name(), "", &options))
-	// Clear session values.
+	// 删除session 信息
 	for k := range session.Values {
 		delete(session.Values, k)
 	}
 	return nil
 }
 
-// ping does an internal ping against a server to check if it is alive.
-//func (s *SentinleStore) ping() (bool, error) {
-//	conn := s.Sentinel.Do()
-//	data, err := conn.Do("PING")
-//	if err != nil || data == nil {
-//		return false, err
-//	}
-//	return (data == "PONG"), nil
-//}
-
-// save stores the session in redis.
+// 实际保存seesion操作.
 func (s *SentinleStore) save(session *sessions.Session) error {
 	b, err := s.serializer.Serialize(session)
 	if err != nil {
@@ -319,8 +275,7 @@ func (s *SentinleStore) save(session *sessions.Session) error {
 	return s.Sentinel.Do(radix.Cmd(nil,"SETEX",s.keyPrefix+session.ID, strconv.Itoa(age), string(b)))
 }
 
-// load reads the session from redis.
-// returns true if there is a sessoin data in DB
+// load 获取到的session信息
 func (s *SentinleStore) load(session *sessions.Session) (bool, error) {
 	var data []byte
 	if err := s.Sentinel.Do(radix.Cmd(&data,"GET",s.keyPrefix+session.ID)); err != nil {
@@ -329,7 +284,7 @@ func (s *SentinleStore) load(session *sessions.Session) (bool, error) {
 	return true, s.serializer.Deserialize(data, session)
 }
 
-// delete removes keys from redis if MaxAge<0
+// 删除redis上的session key
 func (s *SentinleStore) delete(session *sessions.Session) error {
 	return s.Sentinel.Do(radix.Cmd(nil,"DEL", s.keyPrefix+session.ID))
 }
