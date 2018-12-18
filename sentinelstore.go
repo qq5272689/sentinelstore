@@ -9,8 +9,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-	"time"
-	"github.com/mediocregopher/radix.v3"
+	"github.com/qq5272689/radix"
 	"github.com/gorilla/securecookie"
 	"github.com/gorilla/sessions"
 	"strconv"
@@ -118,57 +117,12 @@ func (s *SentinleStore) SetMaxAge(v int) {
 }
 
 
-// sentinel相关配置
 
-var TimeOut = 300
-var RedisPassWord = ""
-var RedisDB = 0
-var RedisPoolNum = 100
-var RedisMasterName = "mymaster"
-var Sentinels = []string{}
-
-// senintel 连接函数
-func sentinelConnFunc(network,addr string) (radix.Conn,error)  {
-	conn,err := radix.DialTimeout(network,addr,time.Millisecond * time.Duration(TimeOut))
-	return conn,err
-}
-// redis 连接函数
-func redisConnFunc(network,addr string) (radix.Conn, error)  {
-	conn, err := radix.DialTimeout(network, addr, time.Millisecond*time.Duration(TimeOut))
-	if err != nil {
-		return nil, err
-	}
-	if len(RedisPassWord)>0{
-		if err := conn.Do(radix.Cmd(nil,"AUTH", RedisPassWord)); err != nil {
-			conn.Close()
-			return nil, err
-		}
-	}
-	if err := conn.Do(radix.Cmd(nil,"SELECT", strconv.Itoa(RedisDB))); err != nil {
-		conn.Close()
-		return nil, err
-	}
-	return conn, nil
-}
-
-
-// redis 连接池 函数
-func redisPoolFunc(network, addr string) (radix.Client, error) {
-	return radix.NewPool(network, addr, RedisPoolNum, radix.PoolConnFunc(redisConnFunc))
-}
 
 // 创建sentine store
-func NewSentinelStore(sentinels []string, mastername, password string,poolsize,timeout,sessionExpire int, keyPairs ...[]byte) (*SentinleStore, error) {
-	Sentinels = sentinels
-	RedisMasterName = mastername
-	RedisPassWord = password
-	RedisPoolNum = poolsize
-	TimeOut = timeout
-
-
-	SentinelRedis,SRError:=radix.NewSentinel(RedisMasterName,Sentinels,radix.SentinelConnFunc(sentinelConnFunc),radix.SentinelPoolFunc(redisPoolFunc))
+func NewSentinelStore(Sentinel *radix.Sentinel,sessionExpire int, keyPairs ...[]byte) (*SentinleStore) {
 	rs := &SentinleStore{
-		Sentinel:   SentinelRedis,
+		Sentinel:   Sentinel,
 		Codecs: securecookie.CodecsFromPairs(keyPairs...),
 		Options: &sessions.Options{
 			Path:   "/",
@@ -179,7 +133,7 @@ func NewSentinelStore(sentinels []string, mastername, password string,poolsize,t
 		keyPrefix:     "session_",
 		serializer:    GobSerializer{},
 	}
-	return rs, SRError
+	return rs
 
 }
 
