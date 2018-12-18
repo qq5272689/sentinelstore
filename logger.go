@@ -7,9 +7,9 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-var logger *log.Logger
+var Logger *log.Logger
 
 func init()  {
-	logger=log.New()
-	logger.Formatter=&log.JSONFormatter{}
+	Logger=log.New()
+	Logger.Formatter=&log.JSONFormatter{}
 }

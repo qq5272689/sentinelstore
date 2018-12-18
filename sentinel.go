@@ -12,20 +12,20 @@ import (
 func sentinelConnFunc(network,addr string) (radix.Conn,error)  {
 	c,err:=radix.Dial(network,addr,radix.DialTimeout(time.Millisecond * time.Duration(MyRedisConf.TimeOut)))
 	if err!=nil{
-		logger.Errorln("sentinel conn dial 报错！！！err:",err)
+		Logger.Errorln("sentinel conn dial 报错！！！err:",err)
 		return c,err
 	}
 	var ping_result string
 	err=c.Do(radix.Cmd(&ping_result,"ping"))
 	if err!=nil{
-		logger.Errorln("sentinel conn do ping 报错！！！err:",err)
+		Logger.Errorln("sentinel conn do ping 报错！！！err:",err)
 		return c,err
 	}
 	if ping_result!="PONG"{
-		logger.Errorln("sentinel conn do ping 没有受到PONG！！！ping_result:",ping_result)
+		Logger.Errorln("sentinel conn do ping 没有受到PONG！！！ping_result:",ping_result)
 		return c,errors.New(fmt.Sprintln("sentinel conn do ping 没有受到PONG！！！ping_result:",ping_result))
 	}
-	logger.Debugln("连接sentine 成功！！！")
+	Logger.Debugln("连接sentine 成功！！！")
 	return c,nil
 }
 
@@ -34,20 +34,20 @@ func redisConnFunc(network,addr string) (radix.Conn, error)  {
 	c,err:=radix.Dial(network,addr,radix.DialAuthPass(MyRedisConf.Password),radix.DialSelectDB(MyRedisConf.DB),
 		radix.DialTimeout(time.Millisecond * time.Duration(MyRedisConf.TimeOut)))
 	if err!=nil{
-		logger.Logger.Errorln("redis conn dial 报错！！！err:",err)
+		Logger.Logger.Errorln("redis conn dial 报错！！！err:",err)
 		return c,err
 	}
 	var ping_result string
 	err=c.Do(radix.Cmd(&ping_result,"ping"))
 	if err!=nil{
-		logger.Logger.Errorln("redis conn do ping 报错！！！err:",err)
+		Logger.Logger.Errorln("redis conn do ping 报错！！！err:",err)
 		return c,err
 	}
 	if ping_result!="PONG"{
-		logger.Logger.Errorln("redis conn do ping 没有受到PONG！！！ping_result:",ping_result)
+		Logger.Logger.Errorln("redis conn do ping 没有受到PONG！！！ping_result:",ping_result)
 		return c,errors.New(fmt.Sprintln("redis conn do ping 没有受到PONG！！！ping_result:",ping_result))
 	}
-	logger.Logger.Debugln("连接 redis 成功！！！")
+	Logger.Logger.Debugln("连接 redis 成功！！！")
 	return c,nil
 }
 
@@ -55,7 +55,7 @@ func redisPoolFunc(network,addr string) (radix.Client,error)  {
 
 	p,err:=radix.NewPool(network,addr,MyRedisConf.Pool,radix.PoolConnFunc(redisConnFunc),radix.PoolOnFullClose())
 	if err!=nil{
-		logger.Logger.Errorln("redis pool dial 报错！！！errr:",err)
+		Logger.Logger.Errorln("redis pool dial 报错！！！errr:",err)
 		return p,err
 	}
 	return p,nil
@@ -72,10 +72,10 @@ func RedisInit(c *RedisConf) (*radix.Sentinel,error) {
 	spf:=radix.SentinelPoolFunc(redisPoolFunc)
 	sentinel,err:= radix.NewSentinel(MyRedisConf.MasterName,MyRedisConf.Sentinels,scf,spf)
 	if err!=nil{
-		logger.Errorln("创建 new sentinel 报错！！！errr:",err)
+		Logger.Errorln("创建 new sentinel 报错！！！errr:",err)
 		return nil,err
 	}
 	Sentinel=sentinel
-	logger.Infoln("Redis 初始化成功！")
+	Logger.Infoln("Redis 初始化成功！")
 	return sentinel,nil
 }
