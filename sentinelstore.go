@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-	"github.com/qq5272689/radix"
+	"github.com/mediocregopher/radix"
 	"github.com/gorilla/securecookie"
 	"github.com/gorilla/sessions"
 	"strconv"

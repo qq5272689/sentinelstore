@@ -3,7 +3,7 @@ package sentinelstore
 
 import (
 	"time"
-	radix "github.com/qq5272689/radix"
+	radix "github.com/mediocregopher/radix"
 	"fmt"
 	"errors"
 )

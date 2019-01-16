@@ -3,7 +3,7 @@ package sentinelstore
 import (
 	nSessions "github.com/goincremental/negroni-sessions"
 	gSessions "github.com/gorilla/sessions"
-	"github.com/qq5272689/radix"
+	"github.com/mediocregopher/radix"
 )
 
 //New returns a new Sentinel store
